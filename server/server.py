@@ -28,6 +28,7 @@ class UdpThread (threading.Thread):
             socket.SO_REUSEPORT = socket.SO_REUSEADDR
         server_socket_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         server_socket_udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        # server_socket_udp.bind(('', 0))
         # Enable broadcasting mode
         server_socket_udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         magic_cookie = 0xfeedbeef
@@ -87,7 +88,6 @@ class TcpThread (threading.Thread):
                 letters[data] = 1
             lock.release()
 
-        print('game over')
         group1_score = sum([teams[team] for team in groups['Group 1']])
         group2_score = sum([teams[team] for team in groups['Group 2']])
         if group2_score < group1_score:
@@ -105,6 +105,24 @@ class TcpThread (threading.Thread):
         for team in groups[winner]:
             message += team + '\n'
 
+        message += f"""
+        Best player from each Group:\n
+        Group 1:
+        """
+
+        player, score = max([item for item in teams.items() if item[0] in groups['Group 1']])
+        message += player + "with a score of: " + score + "!!!\n"
+        """
+        Group 2:
+        """
+        player, score = max([item for item in teams.items() if item[0] in groups['Group 2']])
+        message += player + "with a score of: " + score + "!!!\n"
+
+        letter, times = max(letters.items())
+        message += f"""
+        most clicked key: {letter}, {times} times!!!\n
+        """
+
         client_socket.send(message.encode('utf-8'))
         print(message)
         self.client_socket.close()
@@ -114,26 +132,19 @@ class TcpThread (threading.Thread):
 
 
 def register_team(name):
-    print('registering')
     global players_ready
     lock.acquire()
     teams[name] = 0
     players_ready += 1
-    print(players_ready)
 
     lock.release()
 
 
 def reset_game():
-    global thread_count, players_ready, players_limit, groups, shuffle_ready, game_over, teams, letters
+    global thread_count, players_ready, groups, shuffle_ready, game_over, teams, letters
     thread_count = 0
     players_ready = 0
-    players_limit = 2
-    # groups = {'Group 1': [], 'Group 2': []}
     shuffle_ready = False
-    # game_over = False
-    # teams = {}
-    # letters = {}
 
 
 if __name__ == '__main__':
@@ -141,7 +152,10 @@ if __name__ == '__main__':
         reset_game()
         udp = UdpThread()
         udp.start()
-        print("Server started,listening on ip 192.168.56.1")
+        if restart_game:
+            print("​Game over, sending out offer requests...")
+        else:
+            print("Server started,listening on IP address 192.168.56.1")
         server_socket_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket_tcp.bind(('192.168.56.1', 12345))
         print('TCP socket wait for connection')
@@ -149,6 +163,7 @@ if __name__ == '__main__':
         while True:
             if thread_count != players_limit:
                 client_socket, addr = server_socket_tcp.accept()
+                print('server accepted')
                 if restart_game:
                     restart_game = False
                     groups = {'Group 1': [], 'Group 2': []}
@@ -166,7 +181,6 @@ if __name__ == '__main__':
                 lst = list(teams.keys())
                 random.shuffle(lst)
                 groups['Group 1'], groups['Group 2'] = lst[:int(len(lst) / 2)], lst[int(len(lst) / 2):]
-                print(groups)
                 shuffle_ready = True
                 start_time = time.time()
                 while time.time() < start_time + 10:
@@ -174,6 +188,5 @@ if __name__ == '__main__':
                 game_over = True
                 break
 
-        print('​Game over, sending out offer requests...')
         restart_game = True
         broadcast = True

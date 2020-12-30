@@ -1,7 +1,7 @@
 import socket
-from pynput.keyboard import Listener
 import platform
 import select
+import msvcrt
 
 client_TCP_socket = None
 
@@ -29,7 +29,9 @@ while True:
     if magic == 'feedbeef' and message_type == '02':
         print(f"Received offer from " + addr[0] + " attempting to connect...")
         client_TCP_socket.connect((addr[0], int(port, 16)))
+        print('client connected')
         client_UDP_socket.close()
+        print('udp closed')
 
         """ selecting team name """
         data, addr = client_TCP_socket.recvfrom(1024)
@@ -43,23 +45,30 @@ while True:
         print(data)
 
         """ game starts """
-        try:
-            with Listener(on_press=on_press) as listener:
-                while True:
-                    ready = select.select([client_TCP_socket], [], [], 0.2)
-                    data = None
-                    if ready[0]:
-                        data = client_TCP_socket.recv(1024).decode('utf-8')
-                    if data is not None:
-                        listener.stop()
-                        break
-
-        except KeyboardInterrupt:
-            print('Exit by the user')
+        # try:
+        #     with Listener(on_press=on_press) as listener:
+        #         while True:
+        #             ready = select.select([client_TCP_socket], [], [], 0.2)
+        #             data = None
+        #             if ready[0]:
+        #                 data = client_TCP_socket.recv(1024).decode('utf-8')
+        #             if data is not None:
+        #                 listener.stop()
+        #                 break
+        #
+        # except KeyboardInterrupt:
+        #     print('Exit by the user')
+        while True:
+            ready = select.select([client_TCP_socket], [], [], 0.2)
+            data = None
+            if ready[0]:
+                data = client_TCP_socket.recv(1024).decode('utf-8')
+                break
+            key = msvcrt.getch()
+            if client_TCP_socket is not None:
+                client_TCP_socket.send(key)
 
         """ game over message """
-        # data, addr = client_TCP_socket.recvfrom(1024)
-        # data = data.decode('utf-8')
         print(data)
 
         client_TCP_socket.close()
